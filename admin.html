@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>편집 페이지 · 제물포, 두 번째 개항</title>
+<meta name="robots" content="noindex, nofollow" />
+<style>
+@font-face{font-family:'Pretendard Variable';font-weight:45 920;font-style:normal;font-display:swap;
+  src:url('assets/fonts/PretendardVariable.woff2') format('woff2-variations');}
+:root{
+  --bg:#0b0c11;--card:#16171f;--card-2:#1b1d27;--border:rgba(255,255,255,.09);
+  --text:#e9eaf0;--muted:#9a9cab;--faint:#6b6d7d;
+  --gold:#e7b24e;--cyan:#43e0c9;--red:#ff6b6b;--green:#5ad18a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Pretendard Variable',Pretendard,-apple-system,'Segoe UI','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased;padding-bottom:120px}
+a{color:var(--cyan)}
+.wrap{width:min(860px,94vw);margin-inline:auto}
+
+/* top bar */
+.topbar{position:sticky;top:0;z-index:50;background:rgba(11,12,17,.92);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);padding:14px 0}
+.topbar .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.tb-title{font-weight:800;font-size:1.05rem;letter-spacing:-.01em;margin-right:auto}
+.tb-title .dot{display:inline-block;width:10px;height:10px;border-radius:50%;
+  background:linear-gradient(135deg,var(--gold),var(--cyan));margin-right:8px}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:11px 18px;border-radius:11px;font-weight:700;
+  font-size:.9rem;cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--text);
+  transition:transform .15s,border-color .15s,opacity .15s;font-family:inherit}
+.btn:hover{transform:translateY(-2px);border-color:var(--gold)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn-save{background:linear-gradient(135deg,var(--gold),#d98f3a);color:#20160a;border-color:transparent}
+.btn-sm{padding:7px 12px;font-size:.8rem;font-weight:600}
+
+/* status */
+#status{margin:18px auto 0;padding:13px 18px;border-radius:12px;font-size:.92rem;font-weight:600;
+  border:1px solid var(--border);background:var(--card);display:none}
+#status.show{display:block}
+#status.ok{border-color:rgba(90,209,138,.4);color:var(--green)}
+#status.err{border-color:rgba(255,107,107,.4);color:var(--red)}
+#status.busy{border-color:rgba(231,178,78,.4);color:var(--gold)}
+
+/* setup card */
+.setup{margin:40px auto;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:30px}
+.setup h2{font-size:1.3rem;letter-spacing:-.01em;margin-bottom:8px}
+.setup p{color:var(--muted);font-size:.92rem;margin-bottom:10px}
+.setup ol{margin:14px 0 18px 20px;color:var(--muted);font-size:.9rem;display:flex;flex-direction:column;gap:7px}
+.setup ol b{color:var(--text)}
+.setup input{width:100%;padding:13px 16px;border-radius:11px;border:1px solid var(--border);
+  background:var(--card-2);color:var(--text);font-size:.95rem;font-family:inherit;margin:6px 0 14px}
+.setup input:focus{outline:none;border-color:var(--gold)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.hint{font-size:.8rem;color:var(--faint)}
+
+/* editor */
+#editor{display:none}
+details{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-top:16px;overflow:hidden}
+summary{padding:16px 20px;font-weight:800;font-size:1rem;cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px}
+summary::before{content:"▸";color:var(--gold);transition:transform .2s}
+details[open] summary::before{transform:rotate(90deg)}
+summary .cnt{margin-left:auto;font-size:.75rem;font-weight:600;color:var(--faint)}
+.fields{padding:4px 20px 20px;display:flex;flex-direction:column;gap:14px}
+.field label{display:block;font-size:.82rem;font-weight:700;color:var(--muted);margin-bottom:5px}
+.field textarea{width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--border);
+  background:var(--card-2);color:var(--text);font-size:.92rem;font-family:inherit;line-height:1.55;resize:vertical;min-height:44px}
+.field textarea:focus{outline:none;border-color:var(--cyan)}
+.field.changed textarea{border-color:var(--gold)}
+.field .tag-hint{font-size:.74rem;color:var(--faint);margin-top:4px}
+
+/* images */
+.img-item{display:flex;gap:14px;align-items:center;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--card-2)}
+.img-item img{width:92px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;background:#000}
+.img-item .meta{flex:1;min-width:0}
+.img-item .nm{font-weight:700;font-size:.9rem}
+.img-item .cur{font-size:.75rem;color:var(--faint);word-break:break-all}
+.img-item .picked{font-size:.78rem;color:var(--gold);font-weight:700;display:none}
+.img-item.haspick .picked{display:block}
+.img-item input[type=file]{display:none}
+
+/* save bar */
+.savebar{position:fixed;bottom:0;left:0;right:0;z-index:60;background:rgba(11,12,17,.95);
+  backdrop-filter:blur(12px);border-top:1px solid var(--border);padding:14px 0}
+.savebar .wrap{display:flex;align-items:center;gap:14px}
+.savebar .info{color:var(--muted);font-size:.85rem;margin-right:auto}
+.savebar .info b{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <span class="tb-title"><span class="dot"></span>편집 페이지 — 제물포, 두 번째 개항</span>
+    <a class="btn btn-sm" href="./" target="_blank" rel="noopener">🌐 사이트 보기</a>
+    <button class="btn btn-sm" id="btnReload" style="display:none">↺ 다시 불러오기</button>
+    <button class="btn btn-sm" id="btnLogout" style="display:none">🔑 토큰 변경</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="status"></div>
+
+  <!-- ===== 토큰 설정 화면 ===== -->
+  <div class="setup" id="setup">
+    <h2>🔑 처음 한 번만: GitHub 토큰 연결</h2>
+    <p>이 페이지에서 저장하면 GitHub에 자동 커밋되고, Vercel이 <b style="color:var(--text)">약 1분 안에</b> 홈페이지에 반영합니다.<br>
+       저장 권한을 위해 본인 GitHub 토큰이 필요합니다. (토큰은 이 브라우저에만 저장되며 외부로 전송되지 않습니다 — GitHub API 호출에만 사용)</p>
+    <ol>
+      <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener"><b>여기를 눌러 토큰 만들기</b></a> (yeonbijeong 계정으로 로그인)</li>
+      <li>Token name: <b>portfolio-admin</b> / Expiration: <b>90 days</b></li>
+      <li>Repository access: <b>Only select repositories</b> → <b>from-Jemulpo-to-songdo</b> 선택</li>
+      <li>Permissions → Repository permissions → <b>Contents</b> → <b>Read and write</b> 선택</li>
+      <li>맨 아래 <b>Generate token</b> 클릭 → 나온 토큰(github_pat_…)을 복사</li>
+    </ol>
+    <input type="password" id="tokenInput" placeholder="여기에 토큰 붙여넣기 (github_pat_… 또는 ghp_…)" autocomplete="off" />
+    <div class="row">
+      <button class="btn btn-save" id="btnToken">연결하고 시작하기</button>
+      <button class="btn" id="btnPreview">👀 미리보기 모드 (저장 불가)</button>
+    </div>
+    <p class="hint" style="margin-top:12px">※ 토큰 없이 '미리보기 모드'로 들어가면 내용 확인만 가능하고 저장은 안 됩니다.</p>
+  </div>
+
+  <!-- ===== 편집 화면 ===== -->
+  <div id="editor">
+    <div id="groups"></div>
+    <details id="imgGroup" open>
+      <summary>🖼 이미지 교체 <span class="cnt" id="imgCnt"></span></summary>
+      <div class="fields" id="imgFields"></div>
+    </details>
+  </div>
+</div>
+
+<div class="savebar" id="savebar" style="display:none">
+  <div class="wrap">
+    <span class="info">변경: <b id="chgCnt">0</b>개 항목</span>
+    <button class="btn" id="btnDiscard">변경 취소</button>
+    <button class="btn btn-save" id="btnSave">💾 저장 &amp; 배포</button>
+  </div>
+</div>
+
+<script>
+/* ================= 설정 ================= */
+const OWNER='yeonbijeong', REPO='from-Jemulpo-to-songdo', BRANCH='main';
+const API='https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/';
+const TKEY='jyb_gh_token';
+const GROUP_NAMES={top:'🏠 메인 (히어로)',prologue:'📜 프롤로그',then:'🏛 개화기 갤러리 (글)',now:'🕶 VR 인천',ar:'📱 AR 체험',how:'🛠 제작 과정',about:'👤 소개',contact:'✉️ 연락처'};
+
+let token=null, loadedSha=null, doc=null, previewOnly=false;
+const taMap={}; // key -> {ta, orig, el}
+const imgList=[]; // {el, label, file}
+
+/* ================= 유틸 ================= */
+const $=s=>document.querySelector(s);
+function setStatus(msg,cls){const st=$('#status');st.textContent=msg;st.className='show '+(cls||'');}
+function hideStatus(){$('#status').className='';}
+function b64ToUtf8(b64){const bin=atob(b64.replace(/\s/g,''));const by=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)by[i]=bin.charCodeAt(i);return new TextDecoder('utf-8').decode(by);}
+function utf8ToB64(str){const by=new TextEncoder().encode(str);let bin='';const CH=0x8000;
+  for(let i=0;i<by.length;i+=CH){bin+=String.fromCharCode.apply(null,by.subarray(i,i+CH));}return btoa(bin);}
+async function gh(path,opts){opts=opts||{};
+  const url=API+path+(opts.method?'':((path.indexOf('?')>-1?'&':'?')+'ref='+BRANCH+'&t='+Date.now()));
+  const r=await fetch(url,Object.assign({headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json'}},opts));
+  if(!r.ok){const t=await r.text();throw new Error('GitHub '+r.status+': '+t.slice(0,180));}
+  return r.json();}
+function fileToB64(file){return new Promise((res,rej)=>{const fr=new FileReader();
+  fr.onload=()=>res(String(fr.result).split(',')[1]);fr.onerror=rej;fr.readAsDataURL(file);});}
+
+/* ================= 로드 ================= */
+async function loadFromGitHub(){
+  setStatus('사이트 내용을 불러오는 중…','busy');
+  const data=await gh('index.html');
+  loadedSha=data.sha;
+  buildEditor(b64ToUtf8(data.content));
+  setStatus('불러오기 완료 — 내용을 수정한 뒤 아래 "저장 & 배포"를 누르세요.','ok');
+}
+async function loadPreview(){
+  setStatus('미리보기 모드로 불러오는 중…','busy');
+  const r=await fetch('./index.html?nc='+Date.now(),{cache:'no-store'});
+  if(!r.ok)throw new Error('index.html 로드 실패');
+  buildEditor(await r.text());
+  setStatus('미리보기 모드 — 확인만 가능하며 저장되지 않습니다.','busy');
+}
+function buildEditor(html){
+  doc=new DOMParser().parseFromString(html,'text/html');
+  const groupsEl=$('#groups');groupsEl.innerHTML='';
+  Object.keys(taMap).forEach(k=>delete taMap[k]);imgList.length=0;
+  const groupBox={};
+  doc.querySelectorAll('[data-edit]').forEach(el=>{
+    const key=el.getAttribute('data-edit');
+    const label=el.getAttribute('data-label')||key;
+    const sec=el.closest('section,footer');
+    const gid=sec&&sec.id?sec.id:'etc';
+    if(!groupBox[gid]){
+      const d=document.createElement('details');if(gid==='top')d.open=true;
+      d.innerHTML='<summary>'+(GROUP_NAMES[gid]||gid)+' <span class="cnt"></span></summary><div class="fields"></div>';
+      groupsEl.appendChild(d);groupBox[gid]=d;
+    }
+    const orig=el.innerHTML.trim();
+    const f=document.createElement('div');f.className='field';
+    const hasTag=/<[a-z]/i.test(orig);
+    f.innerHTML='<label></label><textarea spellcheck="false"></textarea>'+
+      (hasTag?'<div class="tag-hint">⚠ &lt;b&gt;, &lt;br&gt; 같은 태그는 그대로 두고 글자만 바꾸세요.</div>':'');
+    f.querySelector('label').textContent=label;
+    const ta=f.querySelector('textarea');ta.value=orig;
+    ta.rows=Math.min(6,Math.max(1,Math.ceil(orig.length/46)));
+    ta.addEventListener('input',()=>{f.classList.toggle('changed',ta.value.trim()!==orig);updateCount();});
+    groupBox[gid].querySelector('.fields').appendChild(f);
+    taMap[key]={ta,orig,field:f};
+  });
+  Object.values(groupBox).forEach(d=>{d.querySelector('.cnt').textContent=d.querySelectorAll('.field').length+'개 항목';});
+  // 이미지
+  const imgFields=$('#imgFields');imgFields.innerHTML='';
+  doc.querySelectorAll('[data-edit-img]').forEach((el,i)=>{
+    const label=el.getAttribute('data-edit-img')||('이미지 '+(i+1));
+    const src=el.getAttribute('src');
+    const item={el,label,file:null};
+    const row=document.createElement('div');row.className='img-item';
+    row.innerHTML='<img loading="lazy"><div class="meta"><div class="nm"></div><div class="cur"></div>'+
+      '<div class="picked">✔ 새 이미지 선택됨 — 저장 시 교체됩니다</div></div>'+
+      '<button class="btn btn-sm">사진 바꾸기</button><input type="file" accept="image/png,image/jpeg,image/webp">';
+    row.querySelector('img').src=src+'?nc='+Date.now();
+    row.querySelector('.nm').textContent=label;
+    row.querySelector('.cur').textContent=src;
+    const fi=row.querySelector('input[type=file]');
+    row.querySelector('button').addEventListener('click',()=>fi.click());
+    fi.addEventListener('change',()=>{
+      const f=fi.files[0];if(!f)return;
+      if(f.size>15*1024*1024){alert('15MB 이하 이미지를 사용해주세요.');fi.value='';return;}
+      item.file=f;row.classList.add('haspick');
+      const url=URL.createObjectURL(f);row.querySelector('img').src=url;
+      updateCount();
+    });
+    imgFields.appendChild(row);imgList.push(item);
+  });
+  $('#imgCnt').textContent=imgList.length+'개';
+  $('#setup').style.display='none';$('#editor').style.display='block';
+  $('#savebar').style.display=previewOnly?'none':'block';
+  $('#btnReload').style.display='inline-flex';
+  $('#btnLogout').style.display='inline-flex';
+  updateCount();
+}
+function changedTexts(){return Object.keys(taMap).filter(k=>taMap[k].ta.value.trim()!==taMap[k].orig);}
+function updateCount(){$('#chgCnt').textContent=changedTexts().length+imgList.filter(i=>i.file).length;}
+
+/* ================= 저장 ================= */
+async function save(){
+  const nTxt=changedTexts().length, imgs=imgList.filter(i=>i.file);
+  if(nTxt===0&&imgs.length===0){setStatus('변경된 내용이 없습니다.','busy');return;}
+  const btn=$('#btnSave');btn.disabled=true;
+  try{
+    setStatus('저장 준비 중…','busy');
+    const fresh=await gh('index.html');
+    if(fresh.sha!==loadedSha){
+      setStatus('⚠ 사이트가 다른 곳에서 수정되었습니다. "다시 불러오기" 후 재수정해주세요.','err');
+      btn.disabled=false;return;
+    }
+    // 1) 이미지 업로드
+    for(let i=0;i<imgs.length;i++){
+      const it=imgs[i];
+      setStatus('이미지 업로드 중… ('+(i+1)+'/'+imgs.length+') '+it.label,'busy');
+      const ext=(it.file.name.split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'')||'png';
+      const path='assets/gallery/img-'+Date.now()+'-'+i+'.'+ext;
+      await gh(path,{method:'PUT',body:JSON.stringify({
+        message:'이미지 교체: '+it.label,branch:BRANCH,content:await fileToB64(it.file)})});
+      it.el.setAttribute('src',path);
+    }
+    // 2) 텍스트 반영
+    changedTexts().forEach(k=>{
+      const el=doc.querySelector('[data-edit="'+k+'"]');
+      if(el)el.innerHTML=taMap[k].ta.value.trim();
+    });
+    // 3) 버전 스탬프
+    const ver='v'+Date.now();
+    let meta=doc.querySelector('meta[name="content-version"]');
+    if(!meta){meta=doc.createElement('meta');meta.setAttribute('name','content-version');doc.head.appendChild(meta);}
+    meta.setAttribute('content',ver);
+    // 4) 커밋
+    setStatus('GitHub에 저장(커밋) 중…','busy');
+    const out='<!DOCTYPE html>\n'+doc.documentElement.outerHTML;
+    const res=await gh('index.html',{method:'PUT',body:JSON.stringify({
+      message:'관리 페이지에서 내용 수정 ('+(nTxt+imgs.length)+'개 항목)',
+      branch:BRANCH,content:utf8ToB64(out),sha:fresh.sha})});
+    loadedSha=res.content.sha;
+    // 원본 갱신
+    Object.keys(taMap).forEach(k=>{taMap[k].orig=taMap[k].ta.value.trim();taMap[k].field.classList.remove('changed');});
+    imgList.forEach(i=>i.file=null);
+    document.querySelectorAll('.img-item.haspick').forEach(r=>r.classList.remove('haspick'));
+    updateCount();
+    // 5) 배포 감시
+    watchDeploy(ver);
+  }catch(e){
+    setStatus('❌ 저장 실패: '+e.message,'err');
+  }
+  btn.disabled=false;
+}
+async function watchDeploy(ver){
+  const onSite=/vercel\.app$/.test(location.hostname)||location.hostname==='from-jemulpo-to-songdo.vercel.app';
+  if(!onSite){setStatus('✅ GitHub 저장 완료! Vercel이 약 1분 안에 홈페이지에 반영합니다.','ok');return;}
+  setStatus('✅ 저장 완료 — Vercel 배포 중… (보통 30초~1분)','busy');
+  const t0=Date.now();
+  const timer=setInterval(async()=>{
+    if(Date.now()-t0>240000){clearInterval(timer);
+      setStatus('저장은 완료됐지만 반영 확인이 오래 걸립니다. 잠시 후 사이트를 새로고침해 보세요.','busy');return;}
+    try{
+      const r=await fetch('/index.html?nc='+Date.now(),{cache:'no-store'});
+      const t=await r.text();
+      if(t.indexOf(ver)>-1){clearInterval(timer);
+        setStatus('🎉 배포 완료! 홈페이지에 반영되었습니다. ("사이트 보기"로 확인하세요)','ok');}
+    }catch(e){}
+  },8000);
+}
+
+/* ================= 이벤트 ================= */
+$('#btnToken').addEventListener('click',async()=>{
+  const v=$('#tokenInput').value.trim();
+  if(!v){alert('토큰을 붙여넣어 주세요.');return;}
+  token=v;previewOnly=false;
+  try{await loadFromGitHub();try{localStorage.setItem(TKEY,v);}catch(e){}}
+  catch(e){token=null;setStatus('❌ 연결 실패: '+e.message+' — 토큰 권한(Contents: Read and write)과 저장소 선택을 확인해주세요.','err');}
+});
+$('#btnPreview').addEventListener('click',async()=>{
+  previewOnly=true;token=null;
+  try{await loadPreview();}catch(e){setStatus('❌ '+e.message,'err');}
+});
+$('#btnSave').addEventListener('click',save);
+$('#btnDiscard').addEventListener('click',()=>{
+  Object.keys(taMap).forEach(k=>{taMap[k].ta.value=taMap[k].orig;taMap[k].field.classList.remove('changed');});
+  imgList.forEach(i=>i.file=null);
+  document.querySelectorAll('.img-item.haspick').forEach(r=>r.classList.remove('haspick'));
+  updateCount();hideStatus();
+});
+$('#btnReload').addEventListener('click',()=>location.reload());
+$('#btnLogout').addEventListener('click',()=>{try{localStorage.removeItem(TKEY);}catch(e){}location.reload();});
+
+/* 자동 로그인 */
+(function(){
+  let t=null;try{t=localStorage.getItem(TKEY);}catch(e){}
+  if(t){token=t;loadFromGitHub().catch(e=>{token=null;
+    setStatus('저장된 토큰으로 연결 실패(만료 가능): '+e.message,'err');});}
+})();
+
+/* 내부 검증용 (콘솔에서 사용) */
+window.__dryRun=function(){return '<!DOCTYPE html>\n'+doc.documentElement.outerHTML;};
+</script>
+</body>
+</html>
