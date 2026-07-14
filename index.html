@@ -28,6 +28,7 @@
   --ring:rgba(91,70,255,.35); --shadow:0 24px 60px -28px rgba(60,50,30,.3);
 }
 *{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none !important}
 html{scroll-behavior:smooth}
 body{font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
   background:var(--bg);color:var(--text);line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:hidden;transition:background .4s,color .4s}
@@ -202,7 +203,7 @@ html.js .reveal.in{opacity:1;transform:none}
 <!-- NAV -->
 <div class="nav-shell" id="navShell"></div>
 <header class="nav" id="nav">
-  <a class="brand" href="#top"><span class="dot"></span>제물포, 두 번째 개항</a>
+  <a class="brand" href="#top" data-edit="brand-top" data-label="상단 로고 텍스트 (span 태그는 유지)"><span class="dot"></span>제물포, 두 번째 개항</a>
   <nav class="nav-links" id="navLinks">
     <a href="#prologue">프롤로그</a>
     <a href="#then">개화기 인천</a>

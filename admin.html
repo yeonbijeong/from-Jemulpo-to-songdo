@@ -69,6 +69,17 @@ summary .cnt{margin-left:auto;font-size:.75rem;font-weight:600;color:var(--faint
 .field.changed textarea{border-color:var(--gold)}
 .field .tag-hint{font-size:.74rem;color:var(--faint);margin-top:4px}
 
+/* menu manager */
+.menu-row{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:11px;background:var(--card-2);flex-wrap:wrap}
+.menu-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--gold);cursor:pointer;flex-shrink:0}
+.menu-row input[type=text]{flex:1;min-width:110px;padding:9px 12px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:.9rem}
+.menu-row input[type=text]:focus{outline:none;border-color:var(--cyan)}
+.menu-row .lk{font-size:.75rem;color:var(--faint);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu-row .del{border-color:rgba(255,107,107,.4);color:var(--red)}
+.menu-row.off{opacity:.5}
+.menu-row .badge{font-size:.68rem;font-weight:700;color:var(--cyan);border:1px solid rgba(67,224,201,.35);border-radius:99px;padding:2px 8px;flex-shrink:0}
+.menu-hint{font-size:.8rem;color:var(--faint);line-height:1.6}
+
 /* images */
 .img-item{display:flex;gap:14px;align-items:center;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--card-2)}
 .img-item img{width:92px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;background:#000}
@@ -123,6 +134,15 @@ summary .cnt{margin-left:auto;font-size:.75rem;font-weight:600;color:var(--faint
 
   <!-- ===== 편집 화면 ===== -->
   <div id="editor">
+    <details id="menuGroup" open>
+      <summary>🧭 메뉴 관리 <span class="cnt" id="menuCnt"></span></summary>
+      <div class="fields">
+        <div class="menu-hint">✔ 체크를 끄면 <b>메뉴와 해당 섹션이 함께 숨겨집니다</b> (내용은 지워지지 않으니 다시 켤 수 있어요).<br>
+        이름 칸을 고치면 메뉴에 표시되는 이름이 바뀝니다. '메뉴 추가'로 외부 링크(예: 노션 이력서)나 섹션 바로가기를 넣을 수 있습니다.</div>
+        <div id="menuRows" style="display:flex;flex-direction:column;gap:10px"></div>
+        <div><button class="btn btn-sm" id="btnAddMenu">➕ 메뉴 추가</button></div>
+      </div>
+    </details>
     <div id="groups"></div>
     <details id="imgGroup" open>
       <summary>🖼 이미지 교체 <span class="cnt" id="imgCnt"></span></summary>
@@ -144,11 +164,12 @@ summary .cnt{margin-left:auto;font-size:.75rem;font-weight:600;color:var(--faint
 const OWNER='yeonbijeong', REPO='from-Jemulpo-to-songdo', BRANCH='main';
 const API='https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/';
 const TKEY='jyb_gh_token';
-const GROUP_NAMES={top:'🏠 메인 (히어로)',prologue:'📜 프롤로그',then:'🏛 개화기 갤러리 (글)',now:'🕶 VR 인천',ar:'📱 AR 체험',how:'🛠 제작 과정',about:'👤 소개',contact:'✉️ 연락처'};
+const GROUP_NAMES={top:'🏠 메인 (히어로)',prologue:'📜 프롤로그',then:'🏛 개화기 갤러리 (글)',now:'🕶 VR 인천',ar:'📱 AR 체험',how:'🛠 제작 과정',about:'👤 소개',contact:'✉️ 연락처',etc:'🔤 사이트 이름 · 기타'};
 
 let token=null, loadedSha=null, doc=null, previewOnly=false;
 const taMap={}; // key -> {ta, orig, el}
 const imgList=[]; // {el, label, file}
+const menuRows=[]; // {a, custom, isNew, deleted, orig:{text,hidden,href}, cb, nameI, hrefI, el}
 
 /* ================= 유틸 ================= */
 const $=s=>document.querySelector(s);
@@ -234,6 +255,7 @@ function buildEditor(html){
     imgFields.appendChild(row);imgList.push(item);
   });
   $('#imgCnt').textContent=imgList.length+'개';
+  buildMenu();
   $('#setup').style.display='none';$('#editor').style.display='block';
   $('#savebar').style.display=previewOnly?'none':'block';
   $('#btnReload').style.display='inline-flex';
@@ -241,12 +263,84 @@ function buildEditor(html){
   updateCount();
 }
 function changedTexts(){return Object.keys(taMap).filter(k=>taMap[k].ta.value.trim()!==taMap[k].orig);}
-function updateCount(){$('#chgCnt').textContent=changedTexts().length+imgList.filter(i=>i.file).length;}
+function updateCount(){$('#chgCnt').textContent=changedTexts().length+imgList.filter(i=>i.file).length+menuChanges();}
+
+/* ================= 메뉴 관리 ================= */
+function buildMenu(){
+  const box=$('#menuRows');box.innerHTML='';menuRows.length=0;
+  doc.querySelectorAll('#navLinks a').forEach(a=>addMenuRow(a,false));
+  $('#menuCnt').textContent=menuRows.length+'개';
+}
+function addMenuRow(a,isNew){
+  const custom=isNew||(a&&a.hasAttribute('data-custom'));
+  const hidden=a?a.hasAttribute('hidden'):false;
+  const text=a?a.textContent.trim():'';
+  const href=a?(a.getAttribute('href')||''):'';
+  const row={a,custom,isNew,deleted:false,orig:{text,hidden,href}};
+  const el=document.createElement('div');el.className='menu-row'+(hidden?' off':'');
+  el.innerHTML='<input type="checkbox" title="메뉴·섹션 표시/숨김"'+(hidden?'':' checked')+'>'+
+    '<input type="text" class="mi-name" placeholder="메뉴 이름">'+
+    (custom
+      ?'<input type="text" class="mi-href" placeholder="링크 주소 (https://… 또는 #about)" style="flex:1.3"><span class="badge">추가 메뉴</span><button class="btn btn-sm del" type="button">삭제</button>'
+      :'<span class="lk"></span>');
+  el.querySelector('.mi-name').value=text;
+  if(custom){el.querySelector('.mi-href').value=href==='#'?'':href;}
+  else el.querySelector('.lk').textContent=href;
+  row.el=el;row.cb=el.querySelector('input[type=checkbox]');
+  row.nameI=el.querySelector('.mi-name');row.hrefI=el.querySelector('.mi-href')||null;
+  row.cb.addEventListener('change',()=>{el.classList.toggle('off',!row.cb.checked);updateCount();});
+  row.nameI.addEventListener('input',updateCount);
+  if(row.hrefI)row.hrefI.addEventListener('input',updateCount);
+  const del=el.querySelector('.del');
+  if(del)del.addEventListener('click',()=>{row.deleted=true;el.remove();updateCount();});
+  $('#menuRows').appendChild(el);
+  menuRows.push(row);
+  return row;
+}
+function menuChanges(){
+  let n=0;
+  menuRows.forEach(r=>{
+    if(r.deleted){if(!r.isNew)n++;return;}
+    if(r.isNew){n++;return;}
+    const nameChanged=r.nameI.value.trim()!==r.orig.text;
+    const visChanged=r.cb.checked===r.orig.hidden; /* 켜짐==원래숨김 → 상태 변경 */
+    const hrefOrig=r.orig.href==='#'?'':r.orig.href;
+    const hrefChanged=r.hrefI?(r.hrefI.value.trim()!==hrefOrig):false;
+    if(nameChanged||visChanged||hrefChanged)n++;
+  });
+  return n;
+}
+function applyMenu(){
+  const navBox=doc.querySelector('#navLinks');
+  menuRows.forEach(r=>{
+    if(r.deleted){if(r.a)r.a.remove();return;}
+    const name=r.nameI.value.trim()||'메뉴';
+    const vis=r.cb.checked;
+    if(!r.a){
+      r.a=doc.createElement('a');
+      r.a.setAttribute('data-custom','1');
+      navBox.appendChild(r.a);
+    }
+    r.a.textContent=name;
+    if(r.hrefI){
+      const h=r.hrefI.value.trim()||'#';
+      r.a.setAttribute('href',h);
+      if(/^https?:/i.test(h)){r.a.setAttribute('target','_blank');r.a.setAttribute('rel','noopener');}
+      else{r.a.removeAttribute('target');r.a.removeAttribute('rel');}
+    }
+    if(vis)r.a.removeAttribute('hidden');else r.a.setAttribute('hidden','');
+    const href=r.a.getAttribute('href')||'';
+    if(href.charAt(0)==='#'&&href.length>1){
+      const t=doc.getElementById(href.slice(1));
+      if(t&&t.tagName==='SECTION'){if(vis)t.removeAttribute('hidden');else t.setAttribute('hidden','');}
+    }
+  });
+}
 
 /* ================= 저장 ================= */
 async function save(){
-  const nTxt=changedTexts().length, imgs=imgList.filter(i=>i.file);
-  if(nTxt===0&&imgs.length===0){setStatus('변경된 내용이 없습니다.','busy');return;}
+  const nTxt=changedTexts().length, imgs=imgList.filter(i=>i.file), nMenu=menuChanges();
+  if(nTxt===0&&imgs.length===0&&nMenu===0){setStatus('변경된 내용이 없습니다.','busy');return;}
   const btn=$('#btnSave');btn.disabled=true;
   try{
     setStatus('저장 준비 중…','busy');
@@ -265,11 +359,12 @@ async function save(){
         message:'이미지 교체: '+it.label,branch:BRANCH,content:await fileToB64(it.file)})});
       it.el.setAttribute('src',path);
     }
-    // 2) 텍스트 반영
+    // 2) 텍스트 + 메뉴 반영
     changedTexts().forEach(k=>{
       const el=doc.querySelector('[data-edit="'+k+'"]');
       if(el)el.innerHTML=taMap[k].ta.value.trim();
     });
+    applyMenu();
     // 3) 버전 스탬프
     const ver='v'+Date.now();
     let meta=doc.querySelector('meta[name="content-version"]');
@@ -279,13 +374,14 @@ async function save(){
     setStatus('GitHub에 저장(커밋) 중…','busy');
     const out='<!DOCTYPE html>\n'+doc.documentElement.outerHTML;
     const res=await gh('index.html',{method:'PUT',body:JSON.stringify({
-      message:'관리 페이지에서 내용 수정 ('+(nTxt+imgs.length)+'개 항목)',
+      message:'관리 페이지에서 내용 수정 ('+(nTxt+imgs.length+nMenu)+'개 항목)',
       branch:BRANCH,content:utf8ToB64(out),sha:fresh.sha})});
     loadedSha=res.content.sha;
     // 원본 갱신
     Object.keys(taMap).forEach(k=>{taMap[k].orig=taMap[k].ta.value.trim();taMap[k].field.classList.remove('changed');});
     imgList.forEach(i=>i.file=null);
     document.querySelectorAll('.img-item.haspick').forEach(r=>r.classList.remove('haspick'));
+    buildMenu(); /* 저장된 상태 기준으로 메뉴 목록 재구성 */
     updateCount();
     // 5) 배포 감시
     watchDeploy(ver);
@@ -328,7 +424,14 @@ $('#btnDiscard').addEventListener('click',()=>{
   Object.keys(taMap).forEach(k=>{taMap[k].ta.value=taMap[k].orig;taMap[k].field.classList.remove('changed');});
   imgList.forEach(i=>i.file=null);
   document.querySelectorAll('.img-item.haspick').forEach(r=>r.classList.remove('haspick'));
+  buildMenu();
   updateCount();hideStatus();
+});
+$('#btnAddMenu').addEventListener('click',()=>{
+  const r=addMenuRow(null,true);
+  r.nameI.focus();
+  $('#menuCnt').textContent=menuRows.filter(x=>!x.deleted).length+'개';
+  updateCount();
 });
 $('#btnReload').addEventListener('click',()=>location.reload());
 $('#btnLogout').addEventListener('click',()=>{try{localStorage.removeItem(TKEY);}catch(e){}location.reload();});
@@ -341,7 +444,11 @@ $('#btnLogout').addEventListener('click',()=>{try{localStorage.removeItem(TKEY);
 })();
 
 /* 내부 검증용 (콘솔에서 사용) */
-window.__dryRun=function(){return '<!DOCTYPE html>\n'+doc.documentElement.outerHTML;};
+window.__dryRun=function(){
+  changedTexts().forEach(k=>{const el=doc.querySelector('[data-edit="'+k+'"]');if(el)el.innerHTML=taMap[k].ta.value.trim();});
+  applyMenu();
+  return '<!DOCTYPE html>\n'+doc.documentElement.outerHTML;
+};
 </script>
 </body>
 </html>
