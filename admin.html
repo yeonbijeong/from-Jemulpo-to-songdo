@@ -112,24 +112,29 @@ summary .cnt{margin-left:auto;font-size:.75rem;font-weight:600;color:var(--faint
 <div class="wrap">
   <div id="status"></div>
 
-  <!-- ===== 토큰 설정 화면 ===== -->
+  <!-- ===== 로그인 화면 ===== -->
   <div class="setup" id="setup">
-    <h2>🔑 처음 한 번만: GitHub 토큰 연결</h2>
-    <p>이 페이지에서 저장하면 GitHub에 자동 커밋되고, Vercel이 <b style="color:var(--text)">약 1분 안에</b> 홈페이지에 반영합니다.<br>
-       저장 권한을 위해 본인 GitHub 토큰이 필요합니다. (토큰은 이 브라우저에만 저장되며 외부로 전송되지 않습니다 — GitHub API 호출에만 사용)</p>
-    <ol>
-      <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener"><b>여기를 눌러 토큰 만들기</b></a> (yeonbijeong 계정으로 로그인)</li>
-      <li>Token name: <b>portfolio-admin</b> / Expiration: <b>90 days</b></li>
-      <li>Repository access: <b>Only select repositories</b> → <b>from-Jemulpo-to-songdo</b> 선택</li>
-      <li>Permissions → Repository permissions → <b>Contents</b> → <b>Read and write</b> 선택</li>
-      <li>맨 아래 <b>Generate token</b> 클릭 → 나온 토큰(github_pat_…)을 복사</li>
-    </ol>
-    <input type="password" id="tokenInput" placeholder="여기에 토큰 붙여넣기 (github_pat_… 또는 ghp_…)" autocomplete="off" />
+    <h2>🔑 편집 시작하기</h2>
+    <p><b style="color:var(--text)">간편 비밀번호</b>를 입력하면 바로 편집할 수 있습니다.
+       저장하면 GitHub에 자동 커밋되고, Vercel이 <b style="color:var(--text)">약 1분 안에</b> 홈페이지에 반영합니다.</p>
+    <input type="password" id="tokenInput" placeholder="간편 비밀번호 입력 (또는 GitHub 토큰)" autocomplete="off" />
     <div class="row">
       <button class="btn btn-save" id="btnToken">연결하고 시작하기</button>
       <button class="btn" id="btnPreview">👀 미리보기 모드 (저장 불가)</button>
     </div>
-    <p class="hint" style="margin-top:12px">※ 토큰 없이 '미리보기 모드'로 들어가면 내용 확인만 가능하고 저장은 안 됩니다.</p>
+    <details style="margin-top:18px;background:var(--card-2)">
+      <summary style="font-size:.85rem">⚙️ 간편 비밀번호가 아직 작동하지 않는다면 (관리자 1회 설정)</summary>
+      <div style="padding:4px 20px 16px">
+        <ol>
+          <li><a href="https://vercel.com" target="_blank" rel="noopener"><b>Vercel</b></a> 로그인 → <b>from-jemulpo-to-songdo</b> 프로젝트 → <b>Settings → Environment Variables</b></li>
+          <li><b>ADMIN_PASSWORD</b> = 원하는 비밀번호 / <b>GITHUB_TOKEN</b> = GitHub 토큰, 두 개 추가</li>
+          <li><b>Deployments</b> 탭 → 최신 배포의 ⋯ 메뉴 → <b>Redeploy</b></li>
+        </ol>
+        <p class="hint">GitHub 토큰 만들기: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a> →
+        Only select repositories → from-Jemulpo-to-songdo → Permissions → Contents: Read and write → Generate</p>
+      </div>
+    </details>
+    <p class="hint" style="margin-top:12px">※ GitHub 토큰(github_pat_…)을 직접 붙여넣어도 똑같이 작동합니다. 비밀번호/토큰은 이 브라우저에만 저장됩니다.</p>
   </div>
 
   <!-- ===== 편집 화면 ===== -->
@@ -184,13 +189,45 @@ async function gh(path,opts){opts=opts||{};
   const r=await fetch(url,Object.assign({headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json'}},opts));
   if(!r.ok){const t=await r.text();throw new Error('GitHub '+r.status+': '+t.slice(0,180));}
   return r.json();}
+let authMode='token'; /* 'token' = GitHub 직접 / 'password' = 서버(/api) 경유 */
+function detectMode(v){return /^(github_pat_|ghp_|gho_)/.test(v)?'token':'password';}
+async function apiGetIndex(){
+  if(authMode==='token')return gh('index.html');
+  const r=await fetch('/api/load?path=index.html&t='+Date.now(),{cache:'no-store'});
+  let d=null;try{d=await r.json();}catch(e){}
+  if(!r.ok||!d||!d.content)throw new Error((d&&(d.error||d.message))||('불러오기 실패 '+r.status+' — 간편 비밀번호는 배포된 편집 페이지(vercel.app 주소)에서만 작동합니다.'));
+  return d;
+}
+async function apiPut(path,payload){ /* payload: {message, content, sha?} */
+  if(authMode==='token')return gh(path,{method:'PUT',body:JSON.stringify(Object.assign({branch:BRANCH},payload))});
+  const r=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(Object.assign({password:token,path},payload))});
+  let d=null;try{d=await r.json();}catch(e){}
+  if(!r.ok)throw new Error((d&&(d.error||d.message))||('저장 실패 '+r.status));
+  return d;
+}
+/* 큰 이미지는 자동 축소 (서버 전송 한도 대응 + 사이트 로딩 속도 개선) */
+async function maybeCompress(file){
+  try{
+    if(!/^image\/(png|jpeg|webp)$/.test(file.type))return file;
+    if(file.size<=1500000)return file;
+    const img=await createImageBitmap(file);
+    const maxW=2000, scale=Math.min(1,maxW/img.width);
+    const w=Math.round(img.width*scale), h=Math.round(img.height*scale);
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.86));
+    if(blob&&blob.size<file.size)return new File([blob],file.name.replace(/\.\w+$/i,'')+'.jpg',{type:'image/jpeg'});
+  }catch(e){}
+  return file;
+}
 function fileToB64(file){return new Promise((res,rej)=>{const fr=new FileReader();
   fr.onload=()=>res(String(fr.result).split(',')[1]);fr.onerror=rej;fr.readAsDataURL(file);});}
 
 /* ================= 로드 ================= */
 async function loadFromGitHub(){
   setStatus('사이트 내용을 불러오는 중…','busy');
-  const data=await gh('index.html');
+  const data=await apiGetIndex();
   loadedSha=data.sha;
   buildEditor(b64ToUtf8(data.content));
   setStatus('불러오기 완료 — 내용을 수정한 뒤 아래 "저장 & 배포"를 누르세요.','ok');
@@ -344,19 +381,20 @@ async function save(){
   const btn=$('#btnSave');btn.disabled=true;
   try{
     setStatus('저장 준비 중…','busy');
-    const fresh=await gh('index.html');
+    const fresh=await apiGetIndex();
     if(fresh.sha!==loadedSha){
       setStatus('⚠ 사이트가 다른 곳에서 수정되었습니다. "다시 불러오기" 후 재수정해주세요.','err');
       btn.disabled=false;return;
     }
-    // 1) 이미지 업로드
+    // 1) 이미지 업로드 (큰 파일은 자동 축소)
     for(let i=0;i<imgs.length;i++){
       const it=imgs[i];
       setStatus('이미지 업로드 중… ('+(i+1)+'/'+imgs.length+') '+it.label,'busy');
-      const ext=(it.file.name.split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'')||'png';
+      const pf=await maybeCompress(it.file);
+      if(authMode==='password'&&pf.size>3000000)throw new Error('"'+it.label+'" 이미지가 너무 큽니다(3MB 초과). 더 작은 이미지를 사용해주세요.');
+      const ext=(pf.name.split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'')||'png';
       const path='assets/gallery/img-'+Date.now()+'-'+i+'.'+ext;
-      await gh(path,{method:'PUT',body:JSON.stringify({
-        message:'이미지 교체: '+it.label,branch:BRANCH,content:await fileToB64(it.file)})});
+      await apiPut(path,{message:'이미지 교체: '+it.label,content:await fileToB64(pf)});
       it.el.setAttribute('src',path);
     }
     // 2) 텍스트 + 메뉴 반영
@@ -373,9 +411,9 @@ async function save(){
     // 4) 커밋
     setStatus('GitHub에 저장(커밋) 중…','busy');
     const out='<!DOCTYPE html>\n'+doc.documentElement.outerHTML;
-    const res=await gh('index.html',{method:'PUT',body:JSON.stringify({
+    const res=await apiPut('index.html',{
       message:'관리 페이지에서 내용 수정 ('+(nTxt+imgs.length+nMenu)+'개 항목)',
-      branch:BRANCH,content:utf8ToB64(out),sha:fresh.sha})});
+      content:utf8ToB64(out),sha:fresh.sha});
     loadedSha=res.content.sha;
     // 원본 갱신
     Object.keys(taMap).forEach(k=>{taMap[k].orig=taMap[k].ta.value.trim();taMap[k].field.classList.remove('changed');});
@@ -410,10 +448,10 @@ async function watchDeploy(ver){
 /* ================= 이벤트 ================= */
 $('#btnToken').addEventListener('click',async()=>{
   const v=$('#tokenInput').value.trim();
-  if(!v){alert('토큰을 붙여넣어 주세요.');return;}
-  token=v;previewOnly=false;
+  if(!v){alert('비밀번호 또는 토큰을 입력해 주세요.');return;}
+  token=v;authMode=detectMode(v);previewOnly=false;
   try{await loadFromGitHub();try{localStorage.setItem(TKEY,v);}catch(e){}}
-  catch(e){token=null;setStatus('❌ 연결 실패: '+e.message+' — 토큰 권한(Contents: Read and write)과 저장소 선택을 확인해주세요.','err');}
+  catch(e){token=null;setStatus('❌ 연결 실패: '+e.message,'err');}
 });
 $('#btnPreview').addEventListener('click',async()=>{
   previewOnly=true;token=null;
@@ -439,8 +477,8 @@ $('#btnLogout').addEventListener('click',()=>{try{localStorage.removeItem(TKEY);
 /* 자동 로그인 */
 (function(){
   let t=null;try{t=localStorage.getItem(TKEY);}catch(e){}
-  if(t){token=t;loadFromGitHub().catch(e=>{token=null;
-    setStatus('저장된 토큰으로 연결 실패(만료 가능): '+e.message,'err');});}
+  if(t){token=t;authMode=detectMode(t);loadFromGitHub().catch(e=>{token=null;
+    setStatus('저장된 비밀번호/토큰으로 연결 실패: '+e.message,'err');});}
 })();
 
 /* 내부 검증용 (콘솔에서 사용) */
